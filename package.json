@@ -1,0 +1,35 @@
+{
+  "name": "coderpad-clone",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -k \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:client": "vite --host 0.0.0.0",
+    "dev:server": "nodemon server/index.cjs",
+    "build": "vite build",
+    "start": "node server/index.cjs",
+    "preview": "npm run build && npm start",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down",
+    "db:logs": "docker compose logs -f postgres"
+  },
+  "dependencies": {
+    "@monaco-editor/react": "latest",
+    "@y/websocket-server": "latest",
+    "express": "latest",
+    "monaco-editor": "latest",
+    "pg": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "ws": "latest",
+    "y-monaco": "latest",
+    "y-websocket": "latest",
+    "yjs": "latest"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "latest",
+    "concurrently": "latest",
+    "nodemon": "latest",
+    "vite": "latest"
+  }
+}
