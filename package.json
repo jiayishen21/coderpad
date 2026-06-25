@@ -9,9 +9,10 @@
     "build": "vite build",
     "start": "node server/index.cjs",
     "preview": "npm run build && npm start",
-    "db:up": "docker compose up -d postgres",
+    "db:up": "docker compose up -d postgres piston",
     "db:down": "docker compose down",
-    "db:logs": "docker compose logs -f postgres"
+    "db:logs": "docker compose logs -f postgres",
+    "piston:install-runtimes": "node scripts/install-piston-runtimes.cjs"
   },
   "dependencies": {
     "@monaco-editor/react": "latest",

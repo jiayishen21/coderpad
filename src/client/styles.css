@@ -91,6 +91,10 @@ select {
   opacity: 0.7;
 }
 
+.smallButton {
+  padding: 9px 16px;
+}
+
 .secondaryButton {
   border: 1px solid rgba(148, 163, 184, 0.35);
   background: rgba(15, 23, 42, 0.8);
@@ -175,6 +179,65 @@ select {
   padding: 10px 18px;
 }
 
+.sessionBody {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+
+.editorPane {
+  display: flex;
+  min-width: 280px;
+  min-height: 0;
+}
+
+.splitter {
+  flex: 0 0 8px;
+  cursor: col-resize;
+  background: #020617;
+  border-left: 1px solid rgba(148, 163, 184, 0.18);
+  border-right: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.splitter:hover,
+.splitter:active {
+  background: rgba(56, 189, 248, 0.18);
+}
+
+.executionPanel {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 280px;
+  min-height: 0;
+  overflow: hidden;
+  background: #020617;
+}
+
+.executionHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 18px;
+  color: #cbd5e1;
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.executionPanel pre {
+  flex: 1 1 auto;
+  margin: 0;
+  overflow: auto;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+  color: #e2e8f0;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  padding: 12px 18px;
+  white-space: pre-wrap;
+}
+
 .editorPanel {
   flex: 1 1 auto;
   height: auto;
@@ -207,5 +270,20 @@ select {
   .toolbarControls {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .sessionBody {
+    flex-direction: column;
+  }
+
+  .editorPane,
+  .executionPanel {
+    flex-basis: 50% !important;
+    min-height: 240px;
+    width: 100%;
+  }
+
+  .splitter {
+    display: none;
   }
 }

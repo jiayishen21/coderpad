@@ -303,6 +303,7 @@ function logClientEvent(docName, event, data = {}) {
 
 module.exports = {
   docs,
+  getYDoc,
   setPersistence,
   setupWSConnection,
 };

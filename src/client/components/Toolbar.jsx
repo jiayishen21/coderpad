@@ -1,14 +1,13 @@
-const LANGUAGES = [
-  "javascript",
-  "typescript",
-  "python",
-  "java",
-  "go",
-  "rust",
-  "markdown",
-];
+const LANGUAGES = ["javascript", "typescript", "python"];
 
-export default function Toolbar({ connected, language, sessionId, onLanguageChange }) {
+export default function Toolbar({
+  connected,
+  isRunning,
+  language,
+  sessionId,
+  onLanguageChange,
+  onRun,
+}) {
   async function copyLink() {
     await navigator.clipboard.writeText(window.location.href);
   }
@@ -35,6 +34,9 @@ export default function Toolbar({ connected, language, sessionId, onLanguageChan
         </label>
         <button className="secondaryButton" onClick={copyLink}>
           Copy link
+        </button>
+        <button className="primaryButton smallButton" disabled={isRunning || !connected} onClick={onRun}>
+          {isRunning ? "Running..." : "Run"}
         </button>
       </div>
     </header>

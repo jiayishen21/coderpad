@@ -12,9 +12,11 @@ const {
 } = require("./db.cjs");
 const {
   docs,
+  getYDoc,
   setPersistence,
   setupWSConnection,
 } = require("./yjsServer.cjs");
+const { executeCode } = require("./executor.cjs");
 
 const PORT = Number(process.env.PORT || 3000);
 const FLUSH_INTERVAL_MS = Number(process.env.FLUSH_INTERVAL_MS || 2 * 60 * 1000);
@@ -55,6 +57,54 @@ async function main() {
     }
   });
 
+  app.post("/sessions/:sessionId/run", async (req, res, next) => {
+    const sessionId = req.params.sessionId;
+
+    try {
+      const sessionDoc = await getYDoc(sessionId);
+      const session = readSessionState(sessionDoc);
+
+      if (!session) {
+        res.status(404).json({ error: "Session not found" });
+        return;
+      }
+
+      console.log(
+        `[client] session=${sessionId} event=execution:start language=${session.language}`,
+      );
+      writeExecutionState(sessionDoc, {
+        isRunning: true,
+        error: "",
+        result: null,
+        updatedAt: new Date().toISOString(),
+      });
+      const result = await executeCode(session);
+      writeExecutionState(sessionDoc, {
+        isRunning: false,
+        error: "",
+        result,
+        updatedAt: new Date().toISOString(),
+      });
+      console.log(
+        `[client] session=${sessionId} event=execution:finish code=${result.run?.code}`,
+      );
+      res.json(result);
+    } catch (error) {
+      const activeDoc = docs.get(sessionId);
+
+      if (activeDoc) {
+        writeExecutionState(activeDoc, {
+          isRunning: false,
+          error: error.message || "Code execution failed.",
+          result: null,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
+      next(error);
+    }
+  });
+
   serveClient(app);
 
   server.on("upgrade", (request, socket, head) => {
@@ -76,7 +126,7 @@ async function main() {
 
   app.use((error, _req, res, _next) => {
     console.error(error);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(error.statusCode || 500).json({ error: error.message || "Internal server error" });
   });
 
   const flushTimer = setInterval(() => flushActiveSessions(docs), FLUSH_INTERVAL_MS);
@@ -117,6 +167,37 @@ async function createSession(sessionId) {
   ydoc.getText("monaco").insert(0, DEFAULT_CODE);
   await saveYDoc(sessionId, ydoc);
   ydoc.destroy();
+}
+
+async function getSessionState(sessionId) {
+  const activeDoc = docs.get(sessionId);
+
+  if (activeDoc) {
+    return readSessionState(activeDoc);
+  }
+
+  const snapshot = await loadSnapshot(sessionId);
+
+  if (!snapshot) {
+    return null;
+  }
+
+  const ydoc = new Y.Doc();
+  Y.applyUpdate(ydoc, new Uint8Array(snapshot));
+  const session = readSessionState(ydoc);
+  ydoc.destroy();
+  return session;
+}
+
+function readSessionState(ydoc) {
+  return {
+    code: ydoc.getText("monaco").toString(),
+    language: ydoc.getMap("metadata").get("language") || "javascript",
+  };
+}
+
+function writeExecutionState(ydoc, executionState) {
+  ydoc.getMap("metadata").set("execution", executionState);
 }
 
 async function flushActiveSessions(docs) {
