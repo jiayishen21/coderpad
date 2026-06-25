@@ -18,7 +18,6 @@ const {
 
 const PORT = Number(process.env.PORT || 3000);
 const FLUSH_INTERVAL_MS = Number(process.env.FLUSH_INTERVAL_MS || 2 * 60 * 1000);
-const UPDATE_SAVE_DEBOUNCE_MS = Number(process.env.UPDATE_SAVE_DEBOUNCE_MS || 500);
 const DOC_EVICTION_GRACE_MS = Number(process.env.DOC_EVICTION_GRACE_MS || 30000);
 const DEFAULT_CODE = `function hello(name) {
   return \`Hello, \${name}!\`;
@@ -85,7 +84,7 @@ async function main() {
   server.listen(PORT, () => {
     console.log(`CoderPad clone listening on http://localhost:${PORT}`);
     console.log(
-      `[server] flushIntervalMs=${FLUSH_INTERVAL_MS} updateSaveDebounceMs=${UPDATE_SAVE_DEBOUNCE_MS} docEvictionGraceMs=${DOC_EVICTION_GRACE_MS}`,
+      `[server] flushIntervalMs=${FLUSH_INTERVAL_MS} docEvictionGraceMs=${DOC_EVICTION_GRACE_MS}`,
     );
   });
 
@@ -94,15 +93,8 @@ async function main() {
 }
 
 function configurePersistence(setPersistence) {
-  const pendingSaves = new Map();
-
   setPersistence({
     bindState: async (docName, ydoc) => {
-      ydoc.on("update", () => {
-        console.log(`[client] session=${docName} event=persistence:schedule-save`);
-        scheduleSave(docName, ydoc, pendingSaves);
-      });
-
       const snapshot = await loadSnapshot(docName);
 
       if (snapshot) {
@@ -113,37 +105,10 @@ function configurePersistence(setPersistence) {
       }
     },
     writeState: async (docName, ydoc) => {
-      clearPendingSave(docName, pendingSaves);
       await saveYDoc(docName, ydoc);
       console.log(`[client] session=${docName} event=persistence:write-final`);
     },
   });
-}
-
-function scheduleSave(docName, ydoc, pendingSaves) {
-  clearPendingSave(docName, pendingSaves);
-
-  const timeout = setTimeout(async () => {
-    pendingSaves.delete(docName);
-
-    try {
-      await saveYDoc(docName, ydoc);
-      console.log(`[client] session=${docName} event=persistence:write-debounced`);
-    } catch (error) {
-      console.error(`Failed to persist ${docName}`, error);
-    }
-  }, UPDATE_SAVE_DEBOUNCE_MS);
-
-  pendingSaves.set(docName, timeout);
-}
-
-function clearPendingSave(docName, pendingSaves) {
-  const timeout = pendingSaves.get(docName);
-
-  if (timeout) {
-    clearTimeout(timeout);
-    pendingSaves.delete(docName);
-  }
 }
 
 async function createSession(sessionId) {
