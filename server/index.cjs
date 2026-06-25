@@ -10,9 +10,16 @@ const {
   loadSnapshot,
   saveSnapshot,
 } = require("./db.cjs");
+const {
+  docs,
+  setPersistence,
+  setupWSConnection,
+} = require("./yjsServer.cjs");
 
 const PORT = Number(process.env.PORT || 3000);
 const FLUSH_INTERVAL_MS = Number(process.env.FLUSH_INTERVAL_MS || 2 * 60 * 1000);
+const UPDATE_SAVE_DEBOUNCE_MS = Number(process.env.UPDATE_SAVE_DEBOUNCE_MS || 500);
+const DOC_EVICTION_GRACE_MS = Number(process.env.DOC_EVICTION_GRACE_MS || 30000);
 const DEFAULT_CODE = `function hello(name) {
   return \`Hello, \${name}!\`;
 }
@@ -21,10 +28,6 @@ console.log(hello("interviewer"));
 `;
 
 async function main() {
-  const { docs, setPersistence, setupWSConnection } = await import(
-    "@y/websocket-server/utils"
-  );
-
   await initDatabase();
   configurePersistence(setPersistence);
 
@@ -33,6 +36,10 @@ async function main() {
   const wss = new WebSocketServer({ noServer: true });
 
   app.use(express.json());
+  app.use((req, _res, next) => {
+    console.log(`[client] http ${req.method} ${req.originalUrl}`);
+    next();
+  });
 
   app.get("/health", (_req, res) => {
     res.json({ ok: true });
@@ -42,6 +49,7 @@ async function main() {
     try {
       const sessionId = randomUUID();
       await createSession(sessionId);
+      console.log(`[client] session=${sessionId} event=session:create`);
       res.status(201).json({ sessionId, url: `/session/${sessionId}` });
     } catch (error) {
       next(error);
@@ -51,6 +59,8 @@ async function main() {
   serveClient(app);
 
   server.on("upgrade", (request, socket, head) => {
+    console.log(`[client] http UPGRADE ${request.url}`);
+
     if (!request.url?.startsWith("/yjs/")) {
       socket.destroy();
       return;
@@ -58,7 +68,10 @@ async function main() {
 
     wss.handleUpgrade(request, socket, head, (ws) => {
       const docName = decodeURIComponent(request.url.slice("/yjs/".length).split("?")[0]);
-      setupWSConnection(ws, request, { docName });
+      setupWSConnection(ws, request, { docName }).catch((error) => {
+        console.error(`Failed to set up websocket for ${docName}`, error);
+        ws.close();
+      });
     });
   });
 
@@ -71,6 +84,9 @@ async function main() {
 
   server.listen(PORT, () => {
     console.log(`CoderPad clone listening on http://localhost:${PORT}`);
+    console.log(
+      `[server] flushIntervalMs=${FLUSH_INTERVAL_MS} updateSaveDebounceMs=${UPDATE_SAVE_DEBOUNCE_MS} docEvictionGraceMs=${DOC_EVICTION_GRACE_MS}`,
+    );
   });
 
   process.on("SIGINT", () => shutdown(server, flushTimer, docs));
@@ -78,28 +94,68 @@ async function main() {
 }
 
 function configurePersistence(setPersistence) {
+  const pendingSaves = new Map();
+
   setPersistence({
     bindState: async (docName, ydoc) => {
+      ydoc.on("update", () => {
+        console.log(`[client] session=${docName} event=persistence:schedule-save`);
+        scheduleSave(docName, ydoc, pendingSaves);
+      });
+
       const snapshot = await loadSnapshot(docName);
 
       if (snapshot) {
         Y.applyUpdate(ydoc, new Uint8Array(snapshot));
+        console.log(`[client] session=${docName} event=persistence:load bytes=${snapshot.length}`);
+      } else {
+        console.log(`[client] session=${docName} event=persistence:miss`);
       }
     },
     writeState: async (docName, ydoc) => {
+      clearPendingSave(docName, pendingSaves);
       await saveYDoc(docName, ydoc);
+      console.log(`[client] session=${docName} event=persistence:write-final`);
     },
   });
 }
 
+function scheduleSave(docName, ydoc, pendingSaves) {
+  clearPendingSave(docName, pendingSaves);
+
+  const timeout = setTimeout(async () => {
+    pendingSaves.delete(docName);
+
+    try {
+      await saveYDoc(docName, ydoc);
+      console.log(`[client] session=${docName} event=persistence:write-debounced`);
+    } catch (error) {
+      console.error(`Failed to persist ${docName}`, error);
+    }
+  }, UPDATE_SAVE_DEBOUNCE_MS);
+
+  pendingSaves.set(docName, timeout);
+}
+
+function clearPendingSave(docName, pendingSaves) {
+  const timeout = pendingSaves.get(docName);
+
+  if (timeout) {
+    clearTimeout(timeout);
+    pendingSaves.delete(docName);
+  }
+}
+
 async function createSession(sessionId) {
   const ydoc = new Y.Doc();
+  ydoc.getMap("metadata").set("language", "javascript");
   ydoc.getText("monaco").insert(0, DEFAULT_CODE);
   await saveYDoc(sessionId, ydoc);
   ydoc.destroy();
 }
 
 async function flushActiveSessions(docs) {
+  console.log(`[client] event=persistence:flush-active count=${docs.size}`);
   await Promise.all(
     Array.from(docs.entries()).map(([docName, ydoc]) => saveYDoc(docName, ydoc)),
   );
@@ -108,6 +164,7 @@ async function flushActiveSessions(docs) {
 async function saveYDoc(docName, ydoc) {
   const snapshot = Y.encodeStateAsUpdate(ydoc);
   await saveSnapshot(docName, snapshot);
+  console.log(`[client] session=${docName} event=persistence:saved bytes=${snapshot.byteLength}`);
 }
 
 function serveClient(app) {

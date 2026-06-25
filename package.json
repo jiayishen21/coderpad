@@ -15,14 +15,15 @@
   },
   "dependencies": {
     "@monaco-editor/react": "latest",
-    "@y/websocket-server": "latest",
     "express": "latest",
+    "lib0": "latest",
     "monaco-editor": "latest",
     "pg": "latest",
     "react": "latest",
     "react-dom": "latest",
     "ws": "latest",
     "y-monaco": "latest",
+    "y-protocols": "latest",
     "y-websocket": "latest",
     "yjs": "latest"
   },

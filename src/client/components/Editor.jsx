@@ -12,6 +12,7 @@ export default function Editor({ language, provider, ydoc }) {
     const text = ydoc.getText("monaco");
     const model = editor.getModel();
     editorRef.current = editor;
+    bindingRef.current?.destroy();
 
     bindingRef.current = new MonacoBinding(
       text,

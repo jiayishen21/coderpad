@@ -188,6 +188,16 @@ select {
   height: 100% !important;
 }
 
+.loadingPanel {
+  display: grid;
+  flex: 1 1 auto;
+  min-height: 0;
+  place-items: center;
+  color: #94a3b8;
+  background: #0f172a;
+  font-weight: 700;
+}
+
 @media (max-width: 760px) {
   .hero {
     padding: 36px 24px;

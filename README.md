@@ -23,6 +23,8 @@ runs on `http://localhost:3000`. The server defaults to:
 
 ```sh
 DATABASE_URL=postgres://coderpad:coderpad@localhost:5432/coderpad
+UPDATE_SAVE_DEBOUNCE_MS=500
+DOC_EVICTION_GRACE_MS=30000
 ```
 
 ## Production Build
