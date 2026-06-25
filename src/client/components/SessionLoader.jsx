@@ -187,11 +187,14 @@ function ExecutionPanel({ executionState }) {
   const { error, isRunning, result, updatedAt } = executionState;
   const compileOutput = result?.compile?.output || "";
   const runOutput = result?.run?.output || "";
-  const output = error || compileOutput || runOutput || "No output.";
+  const timedOut = hasTimedOut(result);
+  const output = getExecutionOutput({ compileOutput, error, isRunning, result, runOutput, timedOut });
   const status = error
     ? "Error"
     : isRunning
       ? "Running"
+      : timedOut
+        ? "Time limit exceeded"
       : result
         ? `Exit ${result.run?.code ?? result.run?.signal ?? "unknown"}`
         : "";
@@ -205,6 +208,29 @@ function ExecutionPanel({ executionState }) {
       <pre>{output}</pre>
     </section>
   );
+}
+
+function hasTimedOut(result) {
+  return result?.compile?.status === "TO" || result?.run?.status === "TO";
+}
+
+function getExecutionOutput({ compileOutput, error, isRunning, result, runOutput, timedOut }) {
+  if (isRunning) {
+    return "Running...";
+  }
+
+  if (error) {
+    return error;
+  }
+
+  if (timedOut) {
+    const timeoutMessage = result?.run?.message || result?.compile?.message;
+    return timeoutMessage
+      ? `Time limit exceeded.\n${timeoutMessage}`
+      : "Time limit exceeded.";
+  }
+
+  return compileOutput || runOutput || "No output.";
 }
 
 function buildUser() {
