@@ -58,9 +58,11 @@ Create a separate Render Web Service for Piston from this repo:
 
 ```text
 Language: Docker
-Root Directory: services/piston
-Build Command: leave blank
-Start Command: leave blank
+Root Directory: leave blank
+Dockerfile Path: services/piston/Dockerfile
+Docker Build Context Directory: .
+Docker Command: leave blank
+Pre-Deploy Command: leave blank
 ```
 
 Set the Piston service environment:
@@ -75,11 +77,8 @@ If Render offers a persistent disk for the service, mount it at:
 /piston
 ```
 
-After the Piston service is deployed, install the runtimes used by the app:
-
-```sh
-PISTON_URL=https://your-piston-service.onrender.com npm run piston:install-runtimes
-```
+The Piston image installs Python, Node/JavaScript, and TypeScript runtimes during
+service startup if they are missing.
 
 Then set the main app service to use that Piston URL:
 
