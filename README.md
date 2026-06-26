@@ -51,3 +51,38 @@ npm start
 In production, Express serves the built React app from `dist` and handles
 `POST /sessions`, `POST /sessions/:sessionId/run`, and websocket sync at
 `/yjs/:sessionId`.
+
+## Render Piston Service
+
+Create a separate Render Web Service for Piston from this repo:
+
+```text
+Language: Docker
+Root Directory: services/piston
+Build Command: leave blank
+Start Command: leave blank
+```
+
+Set the Piston service environment:
+
+```sh
+PORT=2000
+```
+
+If Render offers a persistent disk for the service, mount it at:
+
+```text
+/piston
+```
+
+After the Piston service is deployed, install the runtimes used by the app:
+
+```sh
+PISTON_URL=https://your-piston-service.onrender.com npm run piston:install-runtimes
+```
+
+Then set the main app service to use that Piston URL:
+
+```sh
+PISTON_URL=https://your-piston-service.onrender.com
+```
