@@ -1,4 +1,7 @@
-const PISTON_URL = `http://127.0.0.1:${process.env.PORT || 2000}`;
+const http = require("http");
+
+const PISTON_HOST = "127.0.0.1";
+const PISTON_PORT = Number(process.env.PORT || 2000);
 
 const RUNTIMES = [
   { language: "python", version: "3.x", aliases: ["python", "py"] },
@@ -16,41 +19,84 @@ async function main() {
     }
 
     console.log(`Installing ${runtime.language} ${runtime.version}`);
-    const response = await fetch(`${PISTON_URL}/api/v2/packages`, {
+    const response = await requestJson("/api/v2/packages", {
       method: "POST",
-      headers: { "content-type": "application/json" },
       body: JSON.stringify({
         language: runtime.language,
         version: runtime.version,
       }),
     });
 
-    const body = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
+    if (response.statusCode < 200 || response.statusCode >= 300) {
       throw new Error(
-        `Failed to install ${runtime.language}: ${body.message || response.statusText}`,
+        `Failed to install ${runtime.language}: ${response.body.message || response.statusMessage}`,
       );
     }
 
-    console.log(`Installed ${body.language} ${body.version}`);
+    console.log(`Installed ${response.body.language} ${response.body.version}`);
   }
 }
 
 async function getInstalledRuntimes() {
-  const response = await fetch(`${PISTON_URL}/api/v2/runtimes`);
+  const response = await requestJson("/api/v2/runtimes");
 
-  if (!response.ok) {
-    throw new Error(`Piston API not ready: ${response.status}`);
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    throw new Error(`Piston API not ready: ${response.statusCode}`);
   }
 
-  return response.json();
+  return response.body;
 }
 
 function isRuntimeInstalled(installedRuntimes, aliases) {
   return installedRuntimes.some((runtime) => {
     const runtimeNames = [runtime.language, ...(runtime.aliases || [])];
     return aliases.some((alias) => runtimeNames.includes(alias));
+  });
+}
+
+function requestJson(path, options = {}) {
+  const body = options.body || "";
+
+  return new Promise((resolve, reject) => {
+    const request = http.request(
+      {
+        hostname: PISTON_HOST,
+        port: PISTON_PORT,
+        path,
+        method: options.method || "GET",
+        headers: {
+          "content-type": "application/json",
+          "content-length": Buffer.byteLength(body),
+        },
+      },
+      (response) => {
+        let rawBody = "";
+
+        response.setEncoding("utf8");
+        response.on("data", (chunk) => {
+          rawBody += chunk;
+        });
+        response.on("end", () => {
+          try {
+            resolve({
+              statusCode: response.statusCode,
+              statusMessage: response.statusMessage,
+              body: rawBody ? JSON.parse(rawBody) : {},
+            });
+          } catch (error) {
+            reject(error);
+          }
+        });
+      },
+    );
+
+    request.on("error", reject);
+
+    if (body) {
+      request.write(body);
+    }
+
+    request.end();
   });
 }
 
